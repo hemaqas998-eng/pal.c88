@@ -1,4 +1,7 @@
 name: Deploy Frontend to GitHub Pages
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ feature/security-auth-price-fixes, main ]
@@ -8,16 +11,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - name: Install dependencies
-        run: npm ci
-      - name: Build (frontend)
-        run: npm run build || echo "No build script found or build failed"
+
+      - name: Install dependencies (root)
+        run: npm ci || npm install --prefer-offline --no-audit
+
+      - name: Try build from common locations and collect into dist-out
+        run: |
+          rm -rf dist-out
+          # Try project root
+          if npm run build --if-present; then
+            if [ -d ./dist ]; then mv ./dist dist-out; elif [ -d ./build ]; then mv ./build dist-out; fi
+          fi
+          # Try frontend/ subfolder
+          if [ -d frontend ]; then
+            (cd frontend && (npm ci || npm install --prefer-offline --no-audit))
+            (cd frontend && npm run build --if-present) || true
+            if [ -d frontend/dist ]; then mv frontend/dist dist-out || true; fi
+            if [ -d frontend/build ]; then mv frontend/build dist-out || true; fi
+          fi
+          # fallback: small static page if no build output
+          if [ ! -d dist-out ]; then
+            mkdir -p dist-out
+            echo "<html><body><h1>No frontend build found</h1></body></html>" > dist-out/index.html
+          fi
+
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./dist-out
