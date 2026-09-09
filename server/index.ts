@@ -3,6 +3,7 @@ import bodyParser from 'body-parser';
 import authRouter, { requireAuth } from './auth.js';
 import brokersRouter from './routes/brokers.js';
 import tradesRouter from './routes/trades.js';
+import './radarEngine-wrapper.js';
 import { radarEngine } from './radarEngine.js';
 
 const app = express();
