@@ -15,26 +15,32 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install dependencies (root)
-        run: npm ci || npm install --prefer-offline --no-audit
+      - name: Clear npm cache
+        run: npm cache clean --force
+
+      - name: Install dependencies (root) — prefer ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --prefer-offline || npm ci --no-audit
+          else
+            npm install --legacy-peer-deps --no-audit --prefer-offline || npm install --legacy-peer-deps --no-audit
+          fi
 
       - name: Try build from common locations and collect into dist-out
         run: |
           rm -rf dist-out
-          # Try project root
           if npm run build --if-present; then
             if [ -d ./dist ]; then mv ./dist dist-out; elif [ -d ./build ]; then mv ./build dist-out; fi
           fi
-          # Try frontend/ subfolder
           if [ -d frontend ]; then
-            (cd frontend && (npm ci || npm install --prefer-offline --no-audit))
+            (cd frontend && npm cache clean --force)
+            (cd frontend && if [ -f package-lock.json ]; then npm ci --no-audit --prefer-offline || npm ci --no-audit; else npm install --legacy-peer-deps --no-audit --prefer-offline || npm install --legacy-peer-deps --no-audit; fi)
             (cd frontend && npm run build --if-present) || true
             if [ -d frontend/dist ]; then mv frontend/dist dist-out || true; fi
             if [ -d frontend/build ]; then mv frontend/build dist-out || true; fi
           fi
-          # fallback: small static page if no build output
           if [ ! -d dist-out ]; then
             mkdir -p dist-out
             echo "<html><body><h1>No frontend build found</h1></body></html>" > dist-out/index.html
