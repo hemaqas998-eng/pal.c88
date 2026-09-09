@@ -93,6 +93,32 @@ export interface SignalPattern {
   description: string;
 }
 
+export interface MultiTimeframeCascade {
+  htf: {
+    timeframe: '4h' | '1d' | '1h';
+    bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    keyLevel: number;
+    structure: 'ORDER_BLOCK' | 'LIQUIDITY_SWEEP' | 'MACRO_TREND' | 'FAIR_VALUE_GAP';
+    descArabic: string;
+  };
+  itf: {
+    timeframe: '1h' | '15m' | '30m';
+    bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    structureShift: 'MSS_CONFIRMED' | 'CHoCH' | 'FVG_EXPANSION' | 'CONSOLIDATION';
+    descArabic: string;
+  };
+  ltf: {
+    timeframe: '5m' | '1m' | '15m';
+    bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    trigger: 'ORDER_BLOCK_RETEST' | 'LIQUIDITY_PURGE' | 'MOMENTUM_IGNITION' | 'FVG_TAP';
+    entryConfirmation: boolean;
+    descArabic: string;
+  };
+  cascadeAlignmentScore: number; // 0-100%
+  alignmentStatus: 'PERFECT_CASCADE' | 'STRONG_CASCADE' | 'PARTIAL_CASCADE';
+  cascadeSummaryArabic: string;
+}
+
 export interface SignalNewsImpact {
   hasImpact: boolean;
   highestImpact: 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
@@ -112,9 +138,10 @@ export interface TradeSignal {
   symbol: string;
   timeframe: string;
   direction: SignalDirection;
-  tradeType?: 'SCALP' | 'SWING';
+  tradeType?: 'SCALP' | 'SWING' | 'DAILY_SWING';
   tradeTypeExplanation?: string;
   targetHoldingHorizon?: string;
+  timeframeCascade?: MultiTimeframeCascade;
   pattern: SignalPattern;
   confidence: number; // 0-100%
   entryPrice: number;
@@ -189,8 +216,9 @@ export interface LiveTrade {
   signalId: string;
   symbol: string;
   direction: SignalDirection;
-  tradeType?: 'SCALP' | 'SWING';
+  tradeType?: 'SCALP' | 'SWING' | 'DAILY_SWING';
   tradeTypeExplanation?: string;
+  timeframeCascade?: MultiTimeframeCascade;
   lotSize: number;
   entryPrice: number;
   currentPrice: number;
@@ -848,7 +876,7 @@ export interface TradePostMortem {
   tradeId: string;
   symbol: string;
   direction: SignalDirection;
-  tradeStyle: 'SCALP' | 'SWING';
+  tradeStyle: 'SCALP' | 'SWING' | 'DAILY_SWING';
   lotSize?: number;
   entryPrice: number;
   exitPrice: number;
@@ -1435,5 +1463,150 @@ export interface SymbolLiquidityHeatmap {
     smartMoneyAlphaScore: number;
   };
 }
+
+export interface DeepSeekAnalysisResult {
+  symbol: string;
+  bias: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  mathematicalEdgeScore: number;
+  expectedValueEV: number;
+  optimalKellyFraction: number;
+  reasoningReport: string;
+  orderBookImbalanceAnalysis: string;
+  riskRewardAudit: {
+    recommendedEntry: number;
+    hardStopLoss: number;
+    tp1: number;
+    tp2: number;
+    calculatedRR: number;
+    isMathematicallySound: boolean;
+  };
+  consensusVerdict: 'APPROVE' | 'REVISE' | 'REJECT';
+  antiConflictCheck: {
+    hasConflictingExposure: boolean;
+    recommendation: string;
+  };
+  latencyMs: number;
+  modelUsed: string;
+  timestamp: number;
+}
+
+export interface VetoCondition {
+  isVetoed: boolean;
+  code?: 'VETO_SPREAD_WIDENING' | 'VETO_SUBPAR_RR' | 'VETO_LOW_EV' | 'VETO_MACRO_DIVERGENCE' | 'VETO_NEWS_VOLATILITY' | 'VETO_PRICE_OVEREXTENDED';
+  reasonArabic?: string;
+  reasonEnglish?: string;
+}
+
+export interface DualAiConsensusResult {
+  symbol: string;
+  timestamp: number;
+  consensusDirection: 'BUY' | 'SELL' | 'WAIT' | 'HOLD';
+  consensusScore: number;
+  consensusGrade: 'AAA_PRIME' | 'AA_HIGH_CONFLUENCE' | 'A_MODERATE' | 'VETOED_PROTECTION' | 'NEUTRAL_WAIT';
+  vetoCondition: VetoCondition;
+  geminiInsight: {
+    bias: string;
+    biasScore: number;
+    executiveSummary: string;
+    target1: number;
+    stopLoss: number;
+    recommendedLot: number;
+    liquidityZone?: string;
+    status: 'ONLINE' | 'FALLBACK';
+  };
+  deepSeekAudit: {
+    bias: string;
+    mathematicalEdgeScore: number;
+    expectedValueEV: number;
+    optimalKellyFraction: number;
+    reasoningReport: string;
+    orderBookImbalance: string;
+    verdict: 'APPROVE' | 'REVISE' | 'REJECT';
+    model: string;
+    latencyMs: number;
+  };
+  synthesisPlan: {
+    finalAction: 'BUY' | 'SELL' | 'WAIT';
+    suggestedLot: number;
+    entryPrice: number;
+    limitPullbackEntry?: number;
+    stopLoss: number;
+    takeProfit1: number;
+    takeProfit2: number;
+    riskRewardRatio: number;
+    antiConflictVerified: boolean;
+    zeroLossArmed: boolean;
+    autoBreakEvenThreshold: number;
+    dynamicAtrTrailingStep: number;
+    newsVolatilityShieldActive: boolean;
+    arabicSynthesisSummary: string;
+    auditChecklist?: Array<{ item: string; passed: boolean; note: string }>;
+  };
+}
+
+export interface PredictedCandleTrajectory {
+  candleIndex: number;
+  timeframeLabel: string;
+  expectedDirection: 'BULLISH_EXPANSION' | 'BEARISH_EXPANSION' | 'LIQUIDITY_SWEEP_PULLBACK' | 'CONSOLIDATION';
+  openPrice: number;
+  predictedHigh: number;
+  predictedLow: number;
+  predictedClose: number;
+  probabilityPct: number;
+  tacticalActionArabic: string;
+}
+
+export interface LiveAiNextMovePayload {
+  symbol: string;
+  timestamp: number;
+  isLive: boolean;
+  currentPrice: number;
+  spreadPips: number;
+  atrValue: number;
+  high24h: number;
+  low24h: number;
+  change24h: number;
+  timeframe: string;
+  bias: 'STRONG_BUY' | 'BUY' | 'NEUTRAL_WAIT' | 'SELL' | 'STRONG_SELL';
+  confidenceScore: number;
+  liquidityStructure: {
+    bullishOrderBlock: { min: number; max: number; status: 'ACTIVE' | 'TESTED' | 'MITIGATED' };
+    bearishOrderBlock: { min: number; max: number; status: 'ACTIVE' | 'TESTED' | 'MITIGATED' };
+    fairValueGapTarget: number;
+    nearestLiquidityPool: { price: number; type: 'BUY_SIDE' | 'SELL_SIDE'; volumeEst: string };
+  };
+  predictedTrajectory: PredictedCandleTrajectory[];
+  dynamicLevels: {
+    suggestedEntry: number;
+    limitPullbackEntry: number;
+    stopLoss: number;
+    takeProfit1: number;
+    takeProfit2: number;
+    autoBreakEvenTrigger: number;
+    riskRewardRatio: number;
+    safeLotSize: number;
+    expectedValueEV: number;
+  };
+  nextMoveSummaryArabic: string;
+  executiveActionPlanArabic: string[];
+}
+
+export interface TradeManagementEvaluation {
+  tradeId: string;
+  symbol: string;
+  direction: 'BUY' | 'SELL';
+  entryPrice: number;
+  currentPrice: number;
+  originalStopLoss: number;
+  proposedStopLoss: number;
+  autoBreakEvenTriggered: boolean;
+  atrTrailingTriggered: boolean;
+  actionRequired: 'MOVE_SL_TO_BREAK_EVEN' | 'TRAIL_STOP_PROFIT' | 'HOLD_CURRENT' | 'CLOSE_EMERGENCY_DE_RISK';
+  reasonArabic: string;
+}
+
+
+
+
 
 

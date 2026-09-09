@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { LiveMonitorView } from './components/LiveMonitorView';
 import { InteractiveChart } from './components/InteractiveChart';
-import { PaperTradesView } from './components/PaperTradesView';
+import { LiveBrokerTradesView } from './components/LiveBrokerTradesView';
 import { QuantitativeEngineView } from './components/QuantitativeEngineView';
 import { MarketHoursClosuresView } from './components/MarketHoursClosuresView';
 import { GeminiMasterCenter } from './components/GeminiMasterCenter';
@@ -11,10 +11,13 @@ import { TelegramCreatorHub } from './components/TelegramCreatorHub';
 import { CloudAutonomyHub } from './components/CloudAutonomyHub';
 import { SettingsView } from './components/SettingsView';
 import { FloatingGeminiCopilot } from './components/FloatingGeminiCopilot';
+import { SecurityLoginGate } from './components/SecurityLoginGate';
+import { securityVault } from './services/securityVaultService';
 import { MarketSymbol, TradeSignal, PaperTrade, BotSettings, BotStatus } from './types';
 import { indexedDb } from './services/indexedDbService';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => securityVault.isUnlocked());
   const [activeTab, setActiveTab] = useState<string>('gemini-master');
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [symbols, setSymbols] = useState<MarketSymbol[]>([]);
@@ -350,6 +353,14 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950 w-full max-w-full overflow-x-hidden">
       
+      {/* Security Login & Hardware Encryption Gate */}
+      {!isAuthenticated && (
+        <SecurityLoginGate
+          onAuthenticated={() => setIsAuthenticated(true)}
+          language={settings.language || 'ar'}
+        />
+      )}
+
       {/* Top Navigation & Status Bar */}
       <Navbar
         status={status}
@@ -361,6 +372,10 @@ export default function App() {
         isScanning={isScanning}
         soundEnabled={settings.soundAlerts}
         onToggleSound={() => handleUpdateSettings({ soundAlerts: !settings.soundAlerts })}
+        onLock={() => {
+          securityVault.lock();
+          setIsAuthenticated(false);
+        }}
       />
 
       {/* Main Content View Switcher */}
@@ -432,12 +447,15 @@ export default function App() {
           />
         )}
 
-        {/* Tab 4: Live Paper Trades & Portfolio Ledger */}
+        {/* Tab 4: Live Real Broker Orders & Portfolio Ledger */}
         {activeTab === 'paper-trades' && (
-          <PaperTradesView
+          <LiveBrokerTradesView
             trades={trades}
             status={status}
+            settings={settings}
             onCloseTrade={handleCloseTrade}
+            onOpenBrokerSettings={() => setActiveTab('settings')}
+            language={settings.language || 'ar'}
           />
         )}
 

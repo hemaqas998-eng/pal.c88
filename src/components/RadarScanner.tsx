@@ -281,7 +281,7 @@ export const RadarScanner: React.FC<RadarScannerProps> = ({
 
                   <div>
                     {/* Top Row: Symbol, TF, Direction Badge, Confidence */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2.5">
                         <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center font-bold text-xs text-slate-200 font-mono">
                           {signal.symbol.split('/')[0]}
@@ -310,6 +310,68 @@ export const RadarScanner: React.FC<RadarScannerProps> = ({
                         {isLong ? 'LONG BUY' : 'SHORT SELL'}
                       </div>
                     </div>
+
+                    {/* Trade Classification Badge: Scalp vs Daily Swing */}
+                    <div className="flex items-center justify-between gap-2 mb-3 bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-800/70">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-extrabold flex items-center gap-1 ${
+                          signal.tradeType === 'DAILY_SWING' || signal.tradeType === 'SWING'
+                            ? 'bg-blue-950/80 text-blue-300 border border-blue-500/30'
+                            : 'bg-amber-950/80 text-amber-300 border border-amber-500/30'
+                        }`}>
+                          {signal.tradeType === 'DAILY_SWING' || signal.tradeType === 'SWING' ? '🌊 سوينق يومي (Daily Swing)' : '⚡ مضاربة سريعة (Scalp Sniper)'}
+                        </span>
+                        {signal.targetHoldingHorizon && (
+                          <span className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            {signal.targetHoldingHorizon}
+                          </span>
+                        )}
+                      </div>
+                      {signal.timeframeCascade && (
+                        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-500/30">
+                          تتابع الفريمات {signal.timeframeCascade.cascadeAlignmentScore}%
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Timeframe Cascade Sequence Details if present */}
+                    {signal.timeframeCascade && (
+                      <div className="bg-slate-950/80 border border-cyan-950/60 rounded-xl p-2.5 mb-3 text-xs">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-cyan-300 mb-1.5">
+                          <span className="flex items-center gap-1">
+                            <Layers className="w-3 h-3 text-cyan-400" />
+                            تتابع الفريمات (Multi-Timeframe Cascade)
+                          </span>
+                          <span className="text-[10px] text-cyan-400 font-mono">
+                            {signal.timeframeCascade.alignmentStatus}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5 text-center text-[10px] font-mono mb-1.5">
+                          <div className="bg-slate-900/90 rounded p-1 border border-slate-800">
+                            <span className="text-slate-400 block text-[9px]">{signal.timeframeCascade.htf.timeframe.toUpperCase()} الاتجاه</span>
+                            <span className={signal.timeframeCascade.htf.bias === 'BULLISH' ? 'text-emerald-400 font-bold' : signal.timeframeCascade.htf.bias === 'BEARISH' ? 'text-rose-400 font-bold' : 'text-slate-300 font-bold'}>
+                              {signal.timeframeCascade.htf.bias}
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/90 rounded p-1 border border-slate-800">
+                            <span className="text-slate-400 block text-[9px]">{signal.timeframeCascade.itf.timeframe.toUpperCase()} الهيكل</span>
+                            <span className="text-slate-200 font-bold truncate block" title={signal.timeframeCascade.itf.structureShift}>
+                              {signal.timeframeCascade.itf.structureShift}
+                            </span>
+                          </div>
+                          <div className="bg-slate-900/90 rounded p-1 border border-slate-800">
+                            <span className="text-slate-400 block text-[9px]">{signal.timeframeCascade.ltf.timeframe.toUpperCase()} الدخول</span>
+                            <span className="text-amber-300 font-bold truncate block" title={signal.timeframeCascade.ltf.trigger}>
+                              {signal.timeframeCascade.ltf.trigger}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-300 line-clamp-1">
+                          💡 {signal.timeframeCascade.cascadeSummaryArabic}
+                        </p>
+                      </div>
+                    )}
 
                     {/* News Impact Overlay / Banner on Card */}
                     {hasImpact && (

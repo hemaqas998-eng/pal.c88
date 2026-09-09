@@ -23,7 +23,10 @@ import {
   Clock,
   Cloud,
   Flame,
-  Waves
+  Waves,
+  Lock,
+  ShieldCheck,
+  Cpu
 } from 'lucide-react';
 import { BotStatus, MarketSymbol } from '../types';
 import { useLanguage } from '../context/LanguageContext';
@@ -38,6 +41,7 @@ interface NavbarProps {
   isScanning: boolean;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  onLock?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -50,17 +54,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   isScanning,
   soundEnabled,
   onToggleSound,
+  onLock,
 }) => {
   const { t, language, setLanguage, toggleLanguage } = useLanguage();
   const isRunning = status?.isRunning ?? true;
 
   const navTabs = [
-    { id: 'gemini-master', label: t('tabGeminiMaster'), icon: Sparkles, badge: 'AI', count: status?.activeSignalsCount },
+    { id: 'gemini-master', label: language === 'ar' ? 'الذكاء الثنائي (Gemini + DeepSeek)' : 'Dual AI (Gemini + DeepSeek)', icon: Sparkles, badge: 'DUAL AI', count: status?.activeSignalsCount },
     { id: 'liquidity-heatmap', label: language === 'ar' ? 'خريطة السيولة' : 'Liquidity', icon: Waves, badge: 'LIQ' },
     { id: 'cloud-autonomy', label: language === 'ar' ? 'السحابة 24/7' : 'Cloud 24/7', icon: Cloud, badge: '24/7' },
     { id: 'quantitative', label: t('tabUnifiedQuant'), icon: Calculator, badge: 'QUANT' },
     { id: 'market-hours', label: t('tabMarketHours'), icon: Clock, badge: 'TIME' },
-    { id: 'paper-trades', label: t('tabTrades'), icon: Briefcase, count: status?.openTradesCount },
+    { id: 'paper-trades', label: language === 'ar' ? 'محفظة البروكر الحية' : 'Live Broker Ledger', icon: Briefcase, count: status?.openTradesCount },
     { id: 'chart', label: t('tabChart'), icon: BarChart2 },
     { id: 'monitor', label: t('tabMonitor'), icon: Terminal, badge: 'LIVE' },
     { id: 'telegram-creator', label: t('tabTelegramCreator'), icon: Send, badge: 'TMA', dot: status?.telegramConnected },
@@ -159,6 +164,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Languages className="w-3.5 h-3.5 text-cyan-400" />
               <span className="font-semibold">{language === 'ar' ? '🇸🇦 عربي' : '🇬🇧 EN'}</span>
             </button>
+
+            {/* Security Vault Lock Button */}
+            {onLock && (
+              <button
+                onClick={onLock}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700/80 hover:border-rose-500/40 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                title={language === 'ar' ? 'قفل الخزنة والبيانات الشخصية' : 'Lock Security Vault'}
+              >
+                <Lock className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden lg:inline">{language === 'ar' ? 'قفل الخزنة' : 'Lock'}</span>
+              </button>
+            )}
 
             {/* Start / Pause Bot Toggle */}
             <button

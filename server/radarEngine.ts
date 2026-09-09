@@ -22,7 +22,8 @@ import {
   PortfolioExposureGuard,
   KellyPositionSizeCalculation,
   QuantitativeSynergyMatrix,
-  SymbolLiquidityHeatmap
+  SymbolLiquidityHeatmap,
+  MultiTimeframeCascade
 } from '../src/types.js';
 import fs from 'fs';
 import path from 'path';
@@ -311,6 +312,92 @@ export class RadarEngine {
     }
   }
 
+  /**
+   * High-Precision Multi-Timeframe Cascade System (نظام تتابع الفريمات المؤسسي)
+   * Evaluates HTF (4H Macro), ITF (1H Structure Shift), and LTF (5m Sniper Trigger)
+   */
+  public evaluateMultiTimeframeCascade(symbol: string, targetDirection?: SignalDirection): MultiTimeframeCascade {
+    const sym = this.symbols.find(s => s.symbol === symbol) || this.symbols[0];
+    const digits = sym.digits || 2;
+    const price = sym.price;
+
+    // 1. HTF (4h / 1d) Analysis: Macro Order Flow, Trend, Dominant Structure
+    const htfCandles = generateCandlesForSymbol(symbol, '4h', 50);
+    const htfInd = computeTechnicalIndicators(htfCandles);
+    const htfEmaBull = htfInd.ema20 > htfInd.ema50;
+    const htfRsiBull = htfInd.rsi > 52;
+    const htfBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = (htfEmaBull && htfRsiBull) ? 'BULLISH' : (!htfEmaBull && htfInd.rsi < 48) ? 'BEARISH' : 'NEUTRAL';
+    const htfKeyLevel = +(htfBias === 'BULLISH' ? price - (htfInd.atr * 1.8) : price + (htfInd.atr * 1.8)).toFixed(digits);
+    const htfDesc = htfBias === 'BULLISH'
+      ? `اتجاه صاعد كلي (4H Macro): السعر أعلى متوسط EMA50 مع تدفق سيولة شرائي وتمركز فوق مستوى الدعم $${htfKeyLevel}`
+      : htfBias === 'BEARISH'
+      ? `اتجاه هابط كلي (4H Macro): السعر أسفل متوسط EMA50 مع ضغط بيعي وتمركز أسفل المقاومة $${htfKeyLevel}`
+      : `تذبذب عرضي كلي (4H Equilibrium): السعر في منطقة توازن واختبار نطاق $${htfKeyLevel}`;
+
+    // 2. ITF (1h / 15m) Analysis: Market Structure Shift (MSS), FVG Expansion
+    const itfCandles = generateCandlesForSymbol(symbol, '1h', 50);
+    const itfInd = computeTechnicalIndicators(itfCandles);
+    const itfMacdBull = itfInd.macd.histogram > 0;
+    const itfBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = itfMacdBull ? 'BULLISH' : 'BEARISH';
+    const isMss = (htfBias === itfBias);
+    const itfStructureShift: 'MSS_CONFIRMED' | 'CHoCH' | 'FVG_EXPANSION' | 'CONSOLIDATION' = isMss ? 'MSS_CONFIRMED' : 'CHoCH';
+    const itfDesc = isMss
+      ? `تأكيد هيكلي (1H/15m MSS): اختراق هيكل السوق وتطابق الزخم مع الاتجاه الكلي مع تشكل فجوة قيمة عادلة FVG`
+      : `تحول ديناميكي (1H CHoCH): تغير في سلوك السعر واختبار مستويات السيولة اللحظية`;
+
+    // 3. LTF (5m / 1m) Analysis: Precision Sniper Trigger & Entry Confirmation
+    const ltfCandles = generateCandlesForSymbol(symbol, '5m', 50);
+    const ltfInd = computeTechnicalIndicators(ltfCandles);
+    const ltfTrigger: 'ORDER_BLOCK_RETEST' | 'LIQUIDITY_PURGE' | 'MOMENTUM_IGNITION' | 'FVG_TAP' = 
+      ltfInd.rsi < 35 || ltfInd.rsi > 65 ? 'LIQUIDITY_PURGE' : 'ORDER_BLOCK_RETEST';
+    const ltfBias: 'BULLISH' | 'BEARISH' | 'NEUTRAL' = ltfInd.macd.crossover === 'BULLISH' || (ltfInd.rsi > 50 && ltfInd.rsi < 70) ? 'BULLISH' : 'BEARISH';
+    const entryConfirmation = (targetDirection ? (targetDirection === 'LONG' ? ltfBias === 'BULLISH' : ltfBias === 'BEARISH') : (htfBias === ltfBias));
+    const ltfDesc = entryConfirmation
+      ? `إشارة دخول قناص (5m Sniper Trigger): ارتداد سريع من بلوك الأوامر واكتمال فحص الشمعة الانعكاسية بنجاح`
+      : `انتظار اكتمال شمعة التأكيد (5m Validation): السعر يعيد اختبار مستويات السيولة اللحظية`;
+
+    // Alignment Score
+    let score = 55;
+    if (htfBias !== 'NEUTRAL') score += 15;
+    if (htfBias === itfBias) score += 15;
+    if (itfBias === ltfBias) score += 15;
+    const cascadeAlignmentScore = Math.min(99, score);
+    const alignmentStatus: 'PERFECT_CASCADE' | 'STRONG_CASCADE' | 'PARTIAL_CASCADE' = 
+      cascadeAlignmentScore >= 90 ? 'PERFECT_CASCADE' : cascadeAlignmentScore >= 75 ? 'STRONG_CASCADE' : 'PARTIAL_CASCADE';
+
+    const cascadeSummaryArabic = alignmentStatus === 'PERFECT_CASCADE'
+      ? `تتابع فريمات مثالي (4H Macro + 1H Structure + 5m Sniper): توافق كامل في الاتجاه وتدفق السيولة ونقطة الدخول`
+      : alignmentStatus === 'STRONG_CASCADE'
+      ? `تتابع فريمات قوي: توافق الفريم الكلي والوسيط مع تأكيد نقطة القناص اللحظية`
+      : `تتابع فريمات جزئي: تباين مؤقت بين الفريمات يتطلب تأكيداً مضاعفاً`;
+
+    return {
+      htf: {
+        timeframe: '4h',
+        bias: htfBias,
+        keyLevel: htfKeyLevel,
+        structure: 'ORDER_BLOCK',
+        descArabic: htfDesc
+      },
+      itf: {
+        timeframe: '1h',
+        bias: itfBias,
+        structureShift: itfStructureShift,
+        descArabic: itfDesc
+      },
+      ltf: {
+        timeframe: '5m',
+        bias: ltfBias,
+        trigger: ltfTrigger,
+        entryConfirmation,
+        descArabic: ltfDesc
+      },
+      cascadeAlignmentScore,
+      alignmentStatus,
+      cascadeSummaryArabic
+    };
+  }
+
   private initPreloadedSignals() {
     const initialSeed: Array<{
       symbol: string;
@@ -345,12 +432,12 @@ export class RadarEngine {
         timeframe: '15m',
       },
       {
-        symbol: 'US30',
+        symbol: 'GBP/USD',
         direction: 'LONG',
-        patternName: 'Key Level Liquidity Sweep',
-        patternDesc: 'Dow Jones reacted sharply off 43,600 institutional demand pool.',
+        patternName: 'Bullish Liquidity Sweep & Retest',
+        patternDesc: 'GBP/USD reacted sharply off 1.2940 institutional demand pool with strong momentum.',
         confidence: 89,
-        timeframe: '1h',
+        timeframe: '15m',
       },
       {
         symbol: 'USOIL',
@@ -384,11 +471,13 @@ export class RadarEngine {
       const takeProfit3 = +(isLong ? entryPrice + tp3Dist : entryPrice - tp3Dist).toFixed(sym.digits);
 
       const isSwing = seed.timeframe === '1h' || seed.timeframe === '4h' || seed.timeframe === '1D';
-      const tradeType: 'SCALP' | 'SWING' = isSwing ? 'SWING' : 'SCALP';
+      const tradeType: 'SCALP' | 'DAILY_SWING' = isSwing ? 'DAILY_SWING' : 'SCALP';
       const tradeTypeExplanation = isSwing 
-        ? 'صفقة سوينج (Swing) تستهدف ركوب موجة اتجاهية ممتدة مع إدارة ديناميكية للوقف'
-        : 'صفقة مضاربة سريعة (Scalp) تستهدف حركة خاطفة واقتناص نقاط قريبة مع وقف خسارة محكم';
+        ? 'صفقة سوينق يومي (Daily Swing 🌊): استهداف ركوب موجة اتجاهية ممتدة مع إدارة ديناميكية للوقف'
+        : 'صفقة مضاربة سريعة (Scalp ⚡): استهداف حركة خاطفة واقتناص نقاط قريبة مع وقف خسارة محكم';
       const targetHoldingHorizon = isSwing ? '6h - 3 Days' : '15m - 2h';
+
+      const cascade = this.evaluateMultiTimeframeCascade(seed.symbol, seed.direction);
 
       const signal: TradeSignal = {
         id: `SIG-${seed.symbol.replace(/[\/\s]/g, '')}-${seed.timeframe}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -398,6 +487,7 @@ export class RadarEngine {
         tradeType,
         tradeTypeExplanation,
         targetHoldingHorizon,
+        timeframeCascade: cascade,
         pattern: {
           name: seed.patternName,
           type: seed.patternName.includes('FVG') ? 'FVG' : seed.patternName.includes('Breakout') ? 'BREAKOUT' : seed.patternName.includes('Sweep') ? 'LIQUIDITY_SWEEP' : 'CONTINUATION',
@@ -414,6 +504,7 @@ export class RadarEngine {
         riskRewardRatio: +(tp1Dist / slDist).toFixed(2),
         confluenceScore: Math.floor(seed.confidence * 0.95),
         confluenceFactors: [
+          `🌊 تتابع الفريمات: ${cascade.cascadeSummaryArabic} (${cascade.cascadeAlignmentScore}%)`,
           `${isLong ? 'Bullish' : 'Bearish'} 20/50 EMA Order Alignment`,
           `RSI at ${indicators.rsi.toFixed(1)} confirming ${isLong ? 'bullish' : 'bearish'} momentum`,
           `Key Structural ${isLong ? 'Support' : 'Resistance'} Confluence Zone`,
@@ -470,6 +561,7 @@ export class RadarEngine {
           direction: signal.direction,
           tradeType: signal.tradeType,
           tradeTypeExplanation: signal.tradeTypeExplanation,
+          timeframeCascade: cascade,
           lotSize: 0.01,
           entryPrice: signal.entryPrice,
           currentPrice: signal.currentPrice,
@@ -1007,9 +1099,9 @@ export class RadarEngine {
       const sym = this.symbols.find(s => s.symbol === symStr);
       if (!sym) continue;
 
-      // 🛡️ Strict Asset Governance: Indices & Oil are strictly macro observation barometers only
+      // 🛡️ Strict Asset Governance: Indices are strictly macro observation barometers only
       // All direct trading and auto-scan generation is restricted strictly to Forex, Gold/Silver, and Crypto
-      if (sym.isTradeable === false || sym.macroRole === 'INDICATOR_ONLY') {
+      if (sym.isTradeable === false || sym.macroRole === 'INDICATOR_ONLY' || sym.assetClass === 'indices') {
         continue;
       }
 
@@ -1055,12 +1147,13 @@ export class RadarEngine {
           const direction: SignalDirection = isLong ? 'LONG' : 'SHORT';
           const entryPrice = sym.price;
 
-          // Scalp (مضاربة) vs Swing (سوينج) Classification
+          // High-Precision Timeframe Sequence Cascade Analysis (نظام تتابع الفريمات)
+          const cascade = this.evaluateMultiTimeframeCascade(sym.symbol, direction);
           const isSwing = tf === '1h' || tf === '4h' || tf === '1D';
-          const tradeType: 'SCALP' | 'SWING' = isSwing ? 'SWING' : 'SCALP';
+          const tradeType: 'SCALP' | 'DAILY_SWING' = isSwing ? 'DAILY_SWING' : 'SCALP';
           const tradeTypeExplanation = isSwing 
-            ? 'صفقة سوينج (Swing) تستهدف ركوب موجة اتجاهية ممتدة مع إدارة ديناميكية للوقف'
-            : 'صفقة مضاربة سريعة (Scalp) تستهدف حركة خاطفة واقتناص نقاط قريبة مع وقف خسارة محكم';
+            ? 'صفقة سوينق يومي (Daily Swing 🌊): استهداف ركوب موجة اتجاهية ممتدة مع إدارة ديناميكية للوقف وتتابع الفريمات الكلية'
+            : 'صفقة مضاربة سريعة (Scalp ⚡): استهداف حركة خاطفة واقتناص نقاط قريبة مع وقف خسارة محكم وتأكيد القناص اللحظي';
           const targetHoldingHorizon = isSwing ? '6h - 3 Days' : '15m - 2h';
 
           // Filter by preferred trade style if configured
@@ -1166,7 +1259,8 @@ export class RadarEngine {
               const confluenceScore = Math.min(99, Math.max(50, rawConfluence));
 
               const confluenceFactors = [
-                `${tradeType === 'SCALP' ? '⚡ Scalp Setup' : '🌊 Swing Setup'} (${targetHoldingHorizon})`,
+                `🌊 تتابع الفريمات: ${cascade.cascadeSummaryArabic} (${cascade.cascadeAlignmentScore}%)`,
+                `${tradeType === 'SCALP' ? '⚡ نمط مضاربة سريعة (Scalp)' : '🌊 نمط سوينق يومي (Daily Swing)'} (${targetHoldingHorizon})`,
                 `${isLong ? 'Bullish' : 'Bearish'} 20/50 EMA Order Alignment`,
                 `RSI at ${indicators.rsi.toFixed(1)} (${indicators.rsiSignal})`,
                 `MACD Histogram (${indicators.macd.crossover})`,
@@ -1238,6 +1332,7 @@ export class RadarEngine {
                 tradeType,
                 tradeTypeExplanation,
                 targetHoldingHorizon,
+                timeframeCascade: cascade,
                 pattern: detectedPattern,
                 confidence: detectedPattern.confidence,
                 entryPrice,
@@ -1332,6 +1427,7 @@ export class RadarEngine {
                     direction: newSignal.direction,
                     tradeType: newSignal.tradeType,
                     tradeTypeExplanation: newSignal.tradeTypeExplanation,
+                    timeframeCascade: cascade,
                     lotSize: calculatedLot,
                     entryPrice: actualFill,
                     currentPrice: actualFill,
@@ -1963,7 +2059,7 @@ export class RadarEngine {
     takeProfit2?: number;
     takeProfit3?: number;
     rationale?: string;
-    tradeType?: 'SCALP' | 'SWING';
+    tradeType?: 'SCALP' | 'SWING' | 'DAILY_SWING';
   }): { success: boolean; trade?: PaperTrade; message: string } {
     const symQuery = params.symbol.toUpperCase().replace(/[\s\-_]/g, '');
     let matched = this.symbols.find(s => {
@@ -1988,13 +2084,13 @@ export class RadarEngine {
       matched = this.symbols[0]; // fallback
     }
 
-    // 🛡️ Strict Asset Governance: Block indices and oil from any trade execution
-    // Indices (US30, US100, US500, DXY, VIX, GER40, UK100, JPN225) and Oil (USOIL, UKOIL) are strictly macro barometers
-    if (matched.isTradeable === false || matched.macroRole === 'INDICATOR_ONLY') {
+    // 🛡️ Strict Asset Governance: Block indices from any trade execution
+    // Indices (US30, US100, US500, DXY, VIX, GER40, UK100, JPN225) are strictly macro barometers for currency strength
+    if (matched.isTradeable === false || matched.macroRole === 'INDICATOR_ONLY' || matched.assetClass === 'indices') {
       this.log('WARN', 'EXECUTION', `⛔ [Asset Governance] Direct trade blocked for ${matched.symbol}: Asset is designated strictly as a macro observation reference/barometer. Trading is restricted exclusively to Forex, Gold/Silver, and Crypto.`, {}, matched.symbol);
       return {
         success: false,
-        message: `تم حظر التداول: زوج أو مؤشر ${matched.symbol} مخصص حصرياً كبوصلة ومؤشر مرجعي لقراءة ومتابعة حركة السوق الكلية. التداول متاح فقط على أزواج الفوركس، الذهب والفضة، والعملات الرقمية.`
+        message: `تم حظر التداول: مؤشر ${matched.symbol} مخصص حصرياً كبوصلة ومؤشر مرجعي لقراءة ومتابعة قوة العملات والأسواق الكلية ولا يتم التداول عليه. التداول متاح فقط على أزواج الفوركس، الذهب والفضة، والعملات الرقمية.`
       };
     }
 
@@ -2048,8 +2144,16 @@ export class RadarEngine {
     // Enforce strict lot size cap: Max 0.05 lot for risk discipline
     const requestedLot = params.lotSize || (this.settings.accountBalance <= 500 ? 0.01 : 0.03);
     const lotSize = +(Math.max(0.01, Math.min(0.05, requestedLot))).toFixed(2);
-    const tradeType = params.tradeType || (slDist / entryPrice < 0.008 ? 'SCALP' : 'SWING');
     const rr = +(tp1Dist / Math.max(0.0001, slDist)).toFixed(2);
+
+    // Multi-Timeframe Cascade System Evaluation
+    const cascade = this.evaluateMultiTimeframeCascade(matched.symbol, params.direction);
+    const isDailySwing = (params.tradeType === 'DAILY_SWING' || params.tradeType === 'SWING') || 
+      (params.tradeType !== 'SCALP' && (cascade.alignmentStatus === 'PERFECT_CASCADE' || rr >= 2.8 || (slDist / entryPrice >= 0.008)));
+    const tradeType: 'SCALP' | 'DAILY_SWING' = isDailySwing ? 'DAILY_SWING' : 'SCALP';
+    const tradeTypeExplanation = params.rationale || (tradeType === 'DAILY_SWING'
+      ? `صفقة سوينق يومي (Daily Swing 🌊): استهداف ركوب موجة اتجاهية ممتدة مدعومة بتتابع الفريمات (${cascade.cascadeSummaryArabic})`
+      : `صفقة مضاربة سريعة (Scalp ⚡): اقتناص ارتداد خاطف ووقف محكم مع تأكيد القناص اللحظي`);
 
     const tradeId = `TRD-COPILOT-${matched.symbol.replace(/[\/\s]/g, '')}-${Date.now().toString().slice(-4)}`;
 
@@ -2059,7 +2163,8 @@ export class RadarEngine {
       symbol: matched.symbol,
       direction: params.direction,
       tradeType,
-      tradeTypeExplanation: params.rationale || `صفقة موجهة ذكياً بواسطة مساعد المتداول Gemini Copilot بناءً على تدفق السيولة`,
+      tradeTypeExplanation,
+      timeframeCascade: cascade,
       lotSize,
       entryPrice,
       currentPrice: entryPrice,
@@ -2128,9 +2233,9 @@ export class RadarEngine {
       const sym = this.symbols.find(s => s.symbol === signal.symbol);
       if (!sym) continue;
 
-      // 🛡️ Strict Asset Governance: Skip non-tradeable indices and oil from auto-activation
-      if (sym.isTradeable === false || sym.macroRole === 'INDICATOR_ONLY') {
-        rejectionReasons[signal.id] = `الأصل ${sym.symbol} مخصص حصرياً كبوصلة ومؤشر مرجعي للتحليل الكلي وليس للتداول`;
+      // 🛡️ Strict Asset Governance: Skip non-tradeable indices from auto-activation
+      if (sym.isTradeable === false || sym.macroRole === 'INDICATOR_ONLY' || sym.assetClass === 'indices') {
+        rejectionReasons[signal.id] = `المؤشر ${sym.symbol} مخصص حصرياً كبوصلة ومؤشر مرجعي لتحليل قوة العملات والأسواق الكلية وليس للتداول`;
         continue;
       }
 
@@ -2205,7 +2310,8 @@ export class RadarEngine {
         symbol: signal.symbol,
         direction: signal.direction,
         tradeType: signal.tradeType || 'SCALP',
-        tradeTypeExplanation: `تفعيل خوارزمي فوري مدعوم بنموذج ${signal.pattern.name} وتطابق المؤشرات`,
+        tradeTypeExplanation: signal.tradeTypeExplanation || `تفعيل خوارزمي فوري مدعوم بنموذج ${signal.pattern.name} وتتابع الفريمات`,
+        timeframeCascade: signal.timeframeCascade,
         lotSize: calculatedLot,
         entryPrice: sym.price,
         currentPrice: sym.price,

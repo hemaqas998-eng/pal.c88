@@ -92,12 +92,12 @@ export const FloatingGeminiCopilot: React.FC<FloatingGeminiCopilotProps> = ({
             <div className="text-left rtl:text-right">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wide font-mono">
-                  GEMINI COPILOT
+                  DUAL AI COPILOT
                 </span>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               </div>
               <div className="text-[10px] text-slate-400 flex items-center gap-2">
-                <span>{isRunning ? (isAr ? 'تحكم كمي نشط' : 'Quant Active') : (isAr ? 'البوت متوقف' : 'Bot Paused')}</span>
+                <span>{isRunning ? (isAr ? 'Gemini + DeepSeek نشط' : 'Dual AI Active') : (isAr ? 'البوت متوقف' : 'Bot Paused')}</span>
                 <span className="text-emerald-400 font-bold font-mono">{winRate}% WR</span>
               </div>
             </div>

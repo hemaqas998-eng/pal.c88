@@ -244,20 +244,38 @@ export class TelegramService {
   }
 
   public async sendSignalAlert(signal: TradeSignal, appUrl = ''): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    // 🛡️ Strict Asset Governance: Never dispatch alerts for indices (macro barometers only)
+    const indicesSymbols = ['DXY', 'US10Y', 'VIX', 'US30', 'US100', 'US500', 'GER40', 'UK100', 'JPN225'];
+    if (indicesSymbols.includes(signal.symbol.toUpperCase())) {
+      return { success: false, error: 'المؤشرات مخصصة لتحليل قوة وسرد العملات والأسواق الكلية فقط ولا يتم إرسال صفقات عليها.' };
+    }
+
     const isLong = signal.direction === 'LONG';
     const dirEmoji = isLong ? '🟢 📈 *شراء (LONG BUY)*' : '🔴 📉 *بيع (SHORT SELL)*';
     const confidenceStars = '⭐'.repeat(Math.round(signal.confidence / 20));
-    const tradeTypeBadge = signal.tradeType === 'SWING' 
-      ? '🌊 *صفقة سوينج (SWING)*' 
-      : '⚡ *مضاربة سريعة (SCALP)*';
+    const tradeTypeBadge = signal.tradeType === 'DAILY_SWING' || signal.tradeType === 'SWING'
+      ? '🌊 *صفقة سوينق يومي (DAILY SWING)*' 
+      : '⚡ *مضاربة سريعة (SCALP SNIPER)*';
     
     let message = `🎯 *إشارة رادار التداول الذكي | RADAR SIGNAL*\n\n`;
     message += `*الرمز (Asset):* \`${signal.symbol}\`  •  *الفريم (TF):* \`${signal.timeframe}\`\n`;
     message += `*نوع الصفقة (Type):* ${tradeTypeBadge}\n`;
+    if (signal.tradeTypeExplanation) {
+      message += `*التصنيف:* _${signal.tradeTypeExplanation}_\n`;
+    }
     message += `*الاتجاه (Action):* ${dirEmoji}\n`;
     message += `*النموذج الفني:* *${signal.pattern.name}*\n`;
     message += `*نسبة الثقة:* \`${signal.confidence}%\` (${confidenceStars})\n`;
     message += `*العائد للمخاطرة (R:R):* \`1:${signal.riskRewardRatio.toFixed(2)}\`  •  *التوافق:* \`${signal.confluenceScore}%\`\n\n`;
+
+    if (signal.timeframeCascade) {
+      message += `🌊 *نظام تتابع الفريمات (Multi-Timeframe Cascade):*\n`;
+      message += `• *التوافق:* \`${signal.timeframeCascade.cascadeAlignmentScore}%\` (${signal.timeframeCascade.alignmentStatus})\n`;
+      message += `• *الاتجاه الكلي (${signal.timeframeCascade.htf.timeframe.toUpperCase()}):* \`${signal.timeframeCascade.htf.bias}\` (${signal.timeframeCascade.htf.structure})\n`;
+      message += `• *هيكل السيولة (${signal.timeframeCascade.itf.timeframe.toUpperCase()}):* \`${signal.timeframeCascade.itf.structureShift}\`\n`;
+      message += `• *تأكيد الدخول (${signal.timeframeCascade.ltf.timeframe.toUpperCase()}):* \`${signal.timeframeCascade.ltf.trigger}\`\n`;
+      message += `• *الخلاصة:* ${signal.timeframeCascade.cascadeSummaryArabic}\n\n`;
+    }
     
     message += `━━━━━━━━━━━━━━━━━━━━━\n`;
     message += `📍 *سعر الدخول (Entry):* \`${signal.entryPrice}\`\n`;
