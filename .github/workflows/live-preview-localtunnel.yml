@@ -8,6 +8,7 @@ on:
 jobs:
   preview:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,29 +21,43 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Start server
+      - name: Start server (background) and wait for readiness
         env:
           NODE_ENV: development
           PORT: 3000
         run: |
-          # Start the app in background
-          npm run dev &
-          # Give server time to boot
-          for i in 1 2 3 4 5; do
-            echo "waiting for server... ($i)";
-            sleep 2;
+          # Prefer a start script that runs the server in production mode.
+          # If you only have dev, try using 'npm run start' or 'node server/index.js'
+          if npm run start --if-present; then
+            npm run start & echo $! > server.pid
+          elif npm run dev --if-present; then
+            npm run dev & echo $! > server.pid
+          else
+            # try node entry
+            node server/index.js & echo $! > server.pid || true
+          fi
+
+          # wait for server to respond
+          for i in {1..20}; do
+            if curl -sSf http://localhost:3000/ > /dev/null; then
+              echo "Server is up"; break
+            else
+              echo "waiting for server... ($i)"; sleep 2
+            fi
           done
 
       - name: Start localtunnel and print URL
         run: |
-          # Install localtunnel and start it, capturing stdout to a file
-          npx localtunnel --port 3000 --subdomain palc88-${{ github.run_id }} > lt.url 2>&1 &
+          # install localtunnel if needed and start it
+          npx -y localtunnel --port 3000 --subdomain palc88-${{ github.run_id }} > lt.url 2>&1 &
+          # give it time and then print the file
           sleep 5
           echo "---- localtunnel output ----"
           cat lt.url || true
           echo "---- end output ----"
 
-      - name: Confirm preview
+      - name: Keep job alive briefly for inspection
         run: |
-          echo "If localtunnel started successfully you will see the public URL above."
-          echo "Open it in your browser to access the running preview of the backend (port 3000)."
+          echo "Preview started. Logs above include the public URL if localtunnel succeeded."
+          # Show a little info and then exit
+          ps aux | head -n 20 || true
