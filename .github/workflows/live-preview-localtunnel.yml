@@ -1,48 +1,12 @@
-name: Live Preview (localtunnel)
-on:
-  push:
-    branches: [ feature/security-auth-price-fixes ]
-  schedule:
-    - cron: '*/30 * * * *' # every 30 minutes
-
-jobs:
-  preview:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Start server
-        env:
-          NODE_ENV: development
-          PORT: 3000
         run: |
-          # Start the app in background
-          npm run dev &
-          # Give server time to boot
-          for i in 1 2 3 4 5; do
-            echo "waiting for server... ($i)";
-            sleep 2;
-          done
-
-      - name: Start localtunnel and print URL
-        run: |
-          # Install localtunnel and start it, capturing stdout to a file
-          npx localtunnel --port 3000 --subdomain palc88-${{ github.run_id }} > lt.url 2>&1 &
-          sleep 5
-          echo "---- localtunnel output ----"
-          cat lt.url || true
-          echo "---- end output ----"
-
-      - name: Confirm preview
-        run: |
-          echo "If localtunnel started successfully you will see the public URL above."
-          echo "Open it in your browser to access the running preview of the backend (port 3000)."
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --prefer-offline || npm install --legacy-peer-deps --no-audit --prefer-offline
+          else
+            npm install --legacy-peer-deps --no-audit --prefer-offline
+          fi
