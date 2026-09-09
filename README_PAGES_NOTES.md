@@ -1,7 +1,6 @@
-GitHub Pages configuration notes:
+Notes for GitHub Pages & Live Preview:
 
-- This workflow builds the project and publishes the output directory `./dist` to the `gh-pages` branch.
-- If your frontend build outputs to a different folder (e.g., ./build or frontend/build), update `publish_dir` in .github/workflows/deploy-frontend.yml accordingly.
-- After the first successful run, enable GitHub Pages in the repository settings (if not auto-enabled):
-    Settings -> Pages -> Source: gh-pages branch
-- The site will be available at: https://hemaqas998-eng.github.io/pal.c88/
+- The Pages workflow gathers frontend build output and publishes dist-out to the gh-pages branch.
+- If your frontend builds to another folder (./build or frontend/dist), the workflow already tries common locations.
+- If you prefer stable publishing, run locally: npm install && npm run build then commit the generated package-lock.json and build output path adjustments.
+- After the first successful deploy, enable Pages in Settings → Pages → Source: gh-pages branch (if not auto-enabled).
